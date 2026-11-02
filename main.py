@@ -154,7 +154,7 @@ def _to_epoch(value: Any) -> float:
     PLUGIN_NAME,
     "irislilymoon",
     "按周期用近期对话与长期记忆重写当前使用的人格，只改这一份",
-    "1.1.1",
+    "1.1.2",
 )
 class PersonaEvolve(Star):
     """人格自迭代。"""
