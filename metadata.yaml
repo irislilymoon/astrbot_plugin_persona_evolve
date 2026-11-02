@@ -6,7 +6,7 @@ desc: >-
   在保持角色连续性的前提下重写「当前正在使用」的那一份人格设定。
   每份在用的人格按各自会话的上下文单独迭代，其余人格原样不动；
   改写结果有字数上限，改动前自动备份，并带一个面板可以查看、编辑、应用、删除历史版本。
-version: 1.1.0
+version: 1.1.1
 author: irislilymoon
 repo: https://github.com/irislilymoon/astrbot_plugin_persona_evolve
 astrbot_version: ">=4.24.2"
