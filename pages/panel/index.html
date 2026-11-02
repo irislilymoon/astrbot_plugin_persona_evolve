@@ -26,6 +26,8 @@
         --diff-same: #3f4856;
         --diff-add-mark: #b7ecc7;
         --diff-del-mark: #ffc9c9;
+        --diff-add-bar: #2ea043;
+        --diff-del-bar: #e5484d;
       }
       html[data-theme="dark"] {
         --bg: #0e1116;
@@ -47,6 +49,8 @@
         --diff-same: #c2c9d4;
         --diff-add-mark: rgba(63, 185, 80, 0.45);
         --diff-del-mark: rgba(248, 81, 73, 0.45);
+        --diff-add-bar: #3fb950;
+        --diff-del-bar: #f85149;
       }
       * { box-sizing: border-box; }
       [hidden] { display: none !important; }
@@ -318,22 +322,36 @@
       .dline {
         display: flex;
         align-items: flex-start;
-        gap: 6px;
-        padding: 2px 14px;
+        gap: 10px;
+        padding: 2px 14px 2px 11px;
+        border-left: 3px solid transparent;
         font-size: 15px;
         line-height: 1.75;
       }
-      .dline .sign {
-        width: 1.1em;
+      .dline .gutter {
         flex: none;
-        font-weight: 700;
-        text-align: center;
+        width: 2.4em;
+        padding-top: 3px;
+        text-align: right;
+        color: var(--muted);
+        font-size: 13px;
+        font-variant-numeric: tabular-nums;
         user-select: none;
       }
       .dline .txt { white-space: pre-wrap; word-break: break-word; min-height: 1.75em; }
-      .dline.add { background: var(--diff-add-bg); color: var(--diff-add-fg); }
-      .dline.del { background: var(--diff-del-bg); color: var(--diff-del-fg); }
+      .dline.add {
+        background: var(--diff-add-bg);
+        color: var(--diff-add-fg);
+        border-left-color: var(--diff-add-bar);
+      }
+      .dline.del {
+        background: var(--diff-del-bg);
+        color: var(--diff-del-fg);
+        border-left-color: var(--diff-del-bar);
+      }
       .dline.same { color: var(--diff-same); }
+      .dline.add .gutter { color: var(--diff-add-fg); }
+      .dline.del .gutter { color: var(--diff-del-fg); }
       .dline mark.chg {
         background: var(--diff-add-mark);
         color: inherit;
@@ -616,9 +634,10 @@
             const line = document.createElement("div");
             line.className =
               "dline " + (row.t === "+" ? "add" : row.t === "-" ? "del" : "same");
-            const sign = document.createElement("span");
-            sign.className = "sign";
-            sign.textContent = row.t === " " ? "" : row.t;
+            const gutter = document.createElement("span");
+            gutter.className = "gutter";
+            const lineNo = row.t === "-" ? row.oldNo : row.newNo;
+            gutter.textContent = lineNo === "" ? "" : String(lineNo);
 
             const txt = document.createElement("span");
             txt.className = "txt";
@@ -636,7 +655,7 @@
             } else {
               txt.textContent = row.text;
             }
-            line.append(sign, txt);
+            line.append(gutter, txt);
             frag.appendChild(line);
             if (row.t === "+") add++;
             else if (row.t === "-") del++;
