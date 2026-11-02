@@ -323,21 +323,11 @@
         font-size: 15px;
         line-height: 1.75;
       }
-      .dline .gutter {
-        display: flex;
-        gap: 8px;
-        flex: none;
-        color: var(--muted);
-        font-size: 12px;
-        font-variant-numeric: tabular-nums;
-        user-select: none;
-        padding-top: 4px;
-      }
-      .dline .gutter .num { width: 2em; text-align: right; }
       .dline .sign {
-        width: 1em;
+        width: 1.1em;
         flex: none;
         font-weight: 700;
+        text-align: center;
         user-select: none;
       }
       .dline .txt { white-space: pre-wrap; word-break: break-word; min-height: 1.75em; }
@@ -626,16 +616,6 @@
             const line = document.createElement("div");
             line.className =
               "dline " + (row.t === "+" ? "add" : row.t === "-" ? "del" : "same");
-            const gutter = document.createElement("span");
-            gutter.className = "gutter";
-            const on = document.createElement("span");
-            on.className = "num";
-            on.textContent = row.oldNo === "" ? "" : String(row.oldNo);
-            const nn = document.createElement("span");
-            nn.className = "num";
-            nn.textContent = row.newNo === "" ? "" : String(row.newNo);
-            gutter.append(on, nn);
-
             const sign = document.createElement("span");
             sign.className = "sign";
             sign.textContent = row.t === " " ? "" : row.t;
@@ -656,7 +636,7 @@
             } else {
               txt.textContent = row.text;
             }
-            line.append(gutter, sign, txt);
+            line.append(sign, txt);
             frag.appendChild(line);
             if (row.t === "+") add++;
             else if (row.t === "-") del++;
