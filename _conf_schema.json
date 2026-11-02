@@ -1,0 +1,124 @@
+{
+  "enabled": {
+    "description": "启用自动迭代",
+    "type": "bool",
+    "hint": "关闭后只剩手动指令 /人格迭代 立即 可用。",
+    "default": true
+  },
+  "interval_days": {
+    "description": "迭代频率（天）",
+    "type": "float",
+    "hint": "默认 1 天。可填小数，0.5 表示 12 小时一次。",
+    "default": 1.0
+  },
+  "iterate_all_active": {
+    "description": "多份在用的人格分别迭代",
+    "type": "bool",
+    "hint": "开启后，群聊用默认人格、私聊用私聊人格时，两份会按各自会话的上下文分别迭代；关闭则每轮只迭代最近活跃的那一份。",
+    "default": true
+  },
+  "max_personas_per_run": {
+    "description": "每轮最多迭代几份",
+    "type": "int",
+    "hint": "防止一次跑太多拖时间，按最近活跃排序取前 N 份。",
+    "default": 3
+  },
+  "max_chars": {
+    "description": "改写后人格字数上限",
+    "type": "int",
+    "hint": "按字符数计算，一个汉字算 1。超出按句子边界裁剪。",
+    "default": 800
+  },
+  "min_chars": {
+    "description": "改写后人格字数下限",
+    "type": "int",
+    "hint": "低于这个长度视为生成失败，保留原人格不写入。",
+    "default": 200
+  },
+  "keep_lines": {
+    "description": "必须保留的硬性规则",
+    "type": "list",
+    "hint": "这些行会被强制保留在新人格里，防止迭代把安全约束删掉。一行一条。",
+    "default": [
+      "禁止发布任何网络链接。"
+    ]
+  },
+  "recent_days": {
+    "description": "取材时间范围（天）",
+    "type": "float",
+    "hint": "只读取这段时间内的对话与记忆作为改写依据。",
+    "default": 7.0
+  },
+  "max_conversations": {
+    "description": "最多取几个会话的近期对话",
+    "type": "int",
+    "hint": "按最近活跃排序，只挑使用当前人格的会话。",
+    "default": 3
+  },
+  "messages_per_conversation": {
+    "description": "每个会话取多少条消息",
+    "type": "int",
+    "hint": "24 条约等于 12 轮问答，取自该会话最新的部分。",
+    "default": 24
+  },
+  "use_livingmemory": {
+    "description": "读取长期记忆",
+    "type": "bool",
+    "hint": "以只读方式读取 LivingMemory 的 livingmemory.db，不走它的内部接口。",
+    "default": true
+  },
+  "memory_limit": {
+    "description": "最多取几条长期记忆",
+    "type": "int",
+    "hint": "按重要度与时间排序取前 N 条。",
+    "default": 20
+  },
+  "extra_prompt": {
+    "description": "附加迭代方向",
+    "type": "text",
+    "hint": "写给改写模型的额外要求，例如「这一轮更收敛」「口癖别改」。留空则不加。",
+    "default": ""
+  },
+  "provider_id": {
+    "description": "用于改写的模型 ID",
+    "type": "string",
+    "hint": "留空使用当前默认对话模型。填了就用指定的那个。",
+    "default": ""
+  },
+  "dry_run": {
+    "description": "演练模式",
+    "type": "bool",
+    "hint": "只生成不写入人格，结果存到插件数据目录并记日志，适合先看效果。",
+    "default": false
+  },
+  "run_on_start": {
+    "description": "启动后立即迭代一次",
+    "type": "bool",
+    "hint": "默认关闭：首次加载只记录起点，等满一个间隔再迭代。",
+    "default": false
+  },
+  "notify": {
+    "description": "迭代后发通知",
+    "type": "bool",
+    "hint": "开启后在私聊（或 webchat）里发一条字数变化通知；不会往群里发。",
+    "default": false
+  },
+  "keep_versions": {
+    "description": "保留多少个历史版本",
+    "type": "int",
+    "hint": "用于回滚，超出后自动清理最旧的。",
+    "default": 20
+  },
+  "timeout_seconds": {
+    "description": "单次改写超时（秒）",
+    "type": "int",
+    "hint": "模型响应慢或卡住时，超过这个时间放弃本次迭代。",
+    "default": 180
+  },
+  "debug": {
+    "description": "调试日志",
+    "type": "bool",
+    "hint": "把取材内容、提示词、模型原始输出写进 debug.log，排查时再开。",
+    "default": false
+  }
+}

@@ -1,0 +1,20 @@
+name: astrbot_plugin_persona_evolve
+display_name: 人格自迭代
+short_desc: 按周期用近期对话与记忆重写当前使用的人格，带版本面板
+desc: >-
+  让机器人自己维护自己的人格：按设定的周期，读取当前会话与长期记忆，
+  在保持角色连续性的前提下重写「当前正在使用」的那一份人格设定。
+  每份在用的人格按各自会话的上下文单独迭代，其余人格原样不动；
+  改写结果有字数上限，改动前自动备份，并带一个面板可以查看、编辑、应用、删除历史版本。
+version: 1.1.0
+author: irislilymoon
+astrbot_version: ">=4.24.2"
+support_platforms:
+  - aiocqhttp
+  - qq_official
+  - qq_official_webhook
+  - webchat
+tags:
+  - 人格
+  - 记忆
+  - 自动化

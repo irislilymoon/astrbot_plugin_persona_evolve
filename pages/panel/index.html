@@ -1,0 +1,1090 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <title>人格自迭代</title>
+    <style>
+      :root {
+        --bg: #f5f6f8;
+        --panel: #ffffff;
+        --fg: #1f2328;
+        --muted: #5b6472;
+        --line: #e3e6ea;
+        --accent: #2563eb;
+        --accent-fg: #ffffff;
+        --danger: #d14343;
+        --chip: #eef2ff;
+        --chip-fg: #3730a3;
+        --edit-bg: #fbfcfd;
+        --shadow: 0 1px 2px rgba(16, 24, 40, 0.06);
+        --diff-add-bg: #e6f8ec;
+        --diff-add-fg: #0b7a33;
+        --diff-del-bg: #ffecec;
+        --diff-del-fg: #b42318;
+        --diff-same: #3f4856;
+        --diff-add-mark: #b7ecc7;
+        --diff-del-mark: #ffc9c9;
+      }
+      html[data-theme="dark"] {
+        --bg: #0e1116;
+        --panel: #151a21;
+        --fg: #e8eaee;
+        --muted: #a3adbb;
+        --line: #262c35;
+        --accent: #4c8dff;
+        --accent-fg: #08111f;
+        --danger: #ff6b6b;
+        --chip: #1b2440;
+        --chip-fg: #9db4ff;
+        --edit-bg: #0f1319;
+        --shadow: none;
+        --diff-add-bg: rgba(63, 185, 80, 0.16);
+        --diff-add-fg: #7ee2a8;
+        --diff-del-bg: rgba(248, 81, 73, 0.16);
+        --diff-del-fg: #ffa3a0;
+        --diff-same: #c2c9d4;
+        --diff-add-mark: rgba(63, 185, 80, 0.45);
+        --diff-del-mark: rgba(248, 81, 73, 0.45);
+      }
+      * { box-sizing: border-box; }
+      [hidden] { display: none !important; }
+      html, body { height: 100%; }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--fg);
+        font-family: "Microsoft YaHei", "Microsoft YaHei UI", "PingFang SC",
+          "Hiragino Sans GB", "Source Han Sans SC", "Noto Sans CJK SC", "SimHei",
+          sans-serif;
+        font-size: 15px;
+        font-weight: 600;
+        line-height: 1.65;
+        -webkit-font-smoothing: auto;
+        overflow: hidden;
+      }
+      button {
+        font-family: inherit;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        border: 1px solid var(--line);
+        background: var(--panel);
+        color: var(--fg);
+        border-radius: 8px;
+        padding: 7px 14px;
+        transition: border-color 0.15s, background 0.15s;
+      }
+      button:hover { border-color: var(--accent); }
+      button.primary {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: var(--accent-fg);
+      }
+      button.danger { color: var(--danger); border-color: var(--line); }
+      button.danger:hover { border-color: var(--danger); }
+      button:disabled { opacity: 0.45; cursor: not-allowed; }
+      button.primary:disabled {
+        background: var(--line);
+        border-color: var(--line);
+        color: var(--muted);
+        opacity: 1;
+      }
+      .app { height: 100%; display: flex; flex-direction: column; }
+      header {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 14px 20px;
+        border-bottom: 1px solid var(--line);
+        background: var(--panel);
+      }
+      header h1 { font-size: 17px; margin: 0; font-weight: 700; }
+      header .meta { color: var(--muted); font-size: 13px; }
+      header .spacer { flex: 1; }
+      .layout {
+        flex: 1;
+        display: grid;
+        grid-template-columns: 250px 1fr;
+        min-height: 0;
+      }
+      .sidebar {
+        border-right: 1px solid var(--line);
+        background: var(--panel);
+        overflow: auto;
+        padding: 12px 10px;
+      }
+      .side-title, .col-head h2 {
+        font-size: 13px;
+        color: var(--muted);
+        margin: 4px 6px 10px;
+        font-weight: 700;
+      }
+      .persona {
+        width: 100%;
+        text-align: left;
+        border: 1px solid transparent;
+        border-radius: 9px;
+        padding: 9px 11px;
+        margin-bottom: 4px;
+        background: transparent;
+        line-height: 1.5;
+      }
+      .persona.active {
+        background: var(--chip);
+        border-color: var(--accent);
+      }
+      .persona .name {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        font-weight: 700;
+        font-size: 15px;
+      }
+      .persona .sub { color: var(--muted); font-size: 13px; }
+      .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); flex: none; }
+      .dot.off { background: var(--line); }
+      .main { display: flex; min-width: 0; min-height: 0; }
+      .col { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+      .col.list { width: 336px; border-right: 1px solid var(--line); background: var(--panel); }
+      .col.detail { flex: 1; }
+      .col-head {
+        padding: 14px 18px 10px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        border-bottom: 1px solid var(--line);
+      }
+      .col-head h2 { margin: 0; flex: 1; }
+      .scroll { overflow: auto; padding: 10px 12px 24px; min-height: 0; }
+      .ver {
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        padding: 9px 12px;
+        margin-bottom: 7px;
+        cursor: pointer;
+        background: var(--panel);
+        box-shadow: var(--shadow);
+      }
+      .ver:hover { border-color: var(--accent); }
+      .ver.active { border-color: var(--accent); background: var(--chip); }
+      .ver .row1 {
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+        font-size: 15px;
+        font-weight: 700;
+      }
+      .ver .ts { font-variant-numeric: tabular-nums; }
+      .ver .sub { color: var(--muted); font-size: 13px; margin-top: 2px; }
+      .ver.pinned { border-style: dashed; }
+      .empty { color: var(--muted); padding: 18px 12px; text-align: center; font-size: 14px; }
+      .current {
+        border-bottom: 1px solid var(--line);
+        padding: 6px 18px 10px;
+      }
+      .current summary { cursor: pointer; color: var(--muted); font-size: 13px; padding: 4px 0; }
+      .current pre {
+        margin: 6px 0 0;
+        max-height: 170px;
+        overflow: auto;
+        white-space: pre-wrap;
+        word-break: break-word;
+        font-family: inherit;
+        font-size: 14px;
+        line-height: 1.75;
+        background: var(--edit-bg);
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        padding: 12px;
+      }
+      .tabs { display: flex; gap: 8px; padding: 12px 18px 0; }
+      .tabs button { border-radius: 999px; padding: 5px 14px; font-size: 13px; }
+      .tabs button.active {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: var(--accent-fg);
+      }
+      .hint { padding: 6px 18px 0; color: var(--muted); font-size: 13px; min-height: 22px; }
+      .editor-wrap { flex: 1; display: flex; min-height: 0; padding: 8px 18px 0; }
+      textarea {
+        width: 100%;
+        height: 100%;
+        resize: none;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 14px 16px;
+        background: var(--edit-bg);
+        color: var(--fg);
+        font-family: inherit;
+        font-size: 15px;
+        font-weight: 600;
+        line-height: 1.85;
+        outline: none;
+      }
+      textarea:focus { border-color: var(--accent); }
+      textarea:disabled { opacity: 0.6; }
+      .diff {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        overflow: auto;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: var(--edit-bg);
+        padding: 10px 0;
+        font-family: inherit;
+        font-size: 15px;
+        font-weight: 600;
+        line-height: 1.8;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+      .diff .ln { display: block; padding: 1px 16px; }
+      .diff .ln .sign {
+        display: inline-block;
+        width: 1.3em;
+        font-weight: 700;
+        user-select: none;
+      }
+      .diff .ln.same { color: var(--diff-same); }
+      .diff .ln.add {
+        background: var(--diff-add-bg);
+        color: var(--diff-add-fg);
+      }
+      .diff .ln.del {
+        background: var(--diff-del-bg);
+        color: var(--diff-del-fg);
+      }
+      .diff .ln.empty-line { min-height: 1.8em; }
+      .diff-head {
+        display: flex;
+        gap: 14px;
+        padding: 2px 18px 6px;
+        font-size: 13px;
+        font-weight: 700;
+      }
+      .diff-head .add { color: var(--diff-add-fg); }
+      .diff-head .del { color: var(--diff-del-fg); }
+      .actions { display: flex; gap: 10px; align-items: center; padding: 12px 18px 16px; }
+      .actions .count { color: var(--muted); font-size: 13px; margin-right: auto; }
+      .modal {
+        position: fixed;
+        inset: 0;
+        background: rgba(8, 12, 20, 0.45);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+        z-index: 20;
+      }
+      .modal-card {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        width: min(860px, 100%);
+        max-height: 82vh;
+        display: flex;
+        flex-direction: column;
+        box-shadow: 0 16px 48px rgba(0, 0, 0, 0.28);
+      }
+      .modal-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 12px 16px;
+        border-bottom: 1px solid var(--line);
+        font-weight: 700;
+        font-size: 15px;
+      }
+      .modal-meta { padding: 8px 16px 0; color: var(--muted); font-size: 13px; }
+      .modal-body {
+        margin: 0;
+        padding: 6px 0 10px;
+        overflow: auto;
+        min-height: 120px;
+      }
+      .modal-foot {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        padding: 10px 16px 14px;
+        border-top: 1px solid var(--line);
+      }
+      .modal-foot .count { margin-right: auto; color: var(--muted); font-size: 13px; }
+
+      /* ---- diff 行 ---- */
+      .dline {
+        display: flex;
+        align-items: flex-start;
+        gap: 6px;
+        padding: 2px 14px;
+        font-size: 15px;
+        line-height: 1.75;
+      }
+      .dline .gutter {
+        display: flex;
+        gap: 8px;
+        flex: none;
+        color: var(--muted);
+        font-size: 12px;
+        font-variant-numeric: tabular-nums;
+        user-select: none;
+        padding-top: 4px;
+      }
+      .dline .gutter .num { width: 2em; text-align: right; }
+      .dline .sign {
+        width: 1em;
+        flex: none;
+        font-weight: 700;
+        user-select: none;
+      }
+      .dline .txt { white-space: pre-wrap; word-break: break-word; min-height: 1.75em; }
+      .dline.add { background: var(--diff-add-bg); color: var(--diff-add-fg); }
+      .dline.del { background: var(--diff-del-bg); color: var(--diff-del-fg); }
+      .dline.same { color: var(--diff-same); }
+      .dline mark.chg {
+        background: var(--diff-add-mark);
+        color: inherit;
+        border-radius: 3px;
+        padding: 0 1px;
+      }
+      .dline.del mark.chg { background: var(--diff-del-mark); }
+      #toast {
+        position: fixed;
+        left: 50%;
+        bottom: 22px;
+        transform: translateX(-50%) translateY(20px);
+        background: #1f2937;
+        color: #fff;
+        padding: 9px 18px;
+        border-radius: 999px;
+        font-size: 14px;
+        font-weight: 600;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.2s, transform 0.2s;
+        max-width: 80vw;
+      }
+      #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+      #toast.error { background: var(--danger); }
+      @media (max-width: 900px) {
+        .layout { grid-template-columns: 1fr; }
+        .sidebar {
+          display: flex;
+          overflow-x: auto;
+          border-right: none;
+          border-bottom: 1px solid var(--line);
+          padding: 8px 10px;
+        }
+        .sidebar .side-title { display: none; }
+        .persona { width: auto; margin: 0 6px 0 0; white-space: nowrap; }
+        .main { flex-direction: column; }
+        .col.list { width: auto; max-height: 38%; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <header>
+        <h1>人格自迭代</h1>
+        <span class="meta" id="meta">加载中…</span>
+        <span class="spacer"></span>
+        <button id="dryBtn">演练一次</button>
+        <button id="runBtn" class="primary">立即迭代</button>
+        <button id="reload">刷新</button>
+      </header>
+      <div class="layout">
+        <aside class="sidebar" id="personas">
+          <div class="side-title">人格</div>
+        </aside>
+        <div class="main">
+          <div class="col list">
+            <div class="col-head">
+              <h2 id="verTitle">版本</h2>
+              <button id="refreshVersions">刷新</button>
+            </div>
+            <div class="scroll" id="versions">
+              <div class="empty">先选一份人格</div>
+            </div>
+          </div>
+          <div class="col detail">
+            <details class="current" id="currentBox">
+              <summary>当前生效的人格正文</summary>
+              <pre id="currentText">—</pre>
+            </details>
+            <div class="tabs" id="tabs">
+              <button data-kind="old" class="active">迭代前</button>
+              <button data-kind="new">迭代后</button>
+              <button data-kind="diff">对比</button>
+            </div>
+            <div class="hint" id="hint"></div>
+            <div class="diff-head" id="diffHead" hidden></div>
+            <div class="editor-wrap">
+              <textarea id="editor" spellcheck="false" placeholder="选一个版本查看内容"></textarea>
+              <pre class="diff" id="diffView" hidden></pre>
+            </div>
+            <div class="actions">
+              <span class="count" id="count">—</span>
+              <button id="saveBtn" disabled>保存修改</button>
+              <button id="applyBtn" class="primary" disabled>应用到当前人格</button>
+              <button id="deleteBtn" class="danger" disabled>删除版本</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal" id="modal" hidden>
+        <div class="modal-card">
+          <div class="modal-head">
+            <span id="modalTitle">演练结果</span>
+            <button id="modalClose">关闭</button>
+          </div>
+          <div class="modal-meta" id="modalMeta"></div>
+          <div class="modal-body" id="modalBody"></div>
+          <div class="modal-foot" id="modalFoot" hidden>
+            <span class="count" id="modalCount"></span>
+            <button id="modalCancel">取消</button>
+            <button id="modalSave" class="primary">保存并应用</button>
+          </div>
+        </div>
+      </div>
+      <div id="toast"></div>
+    </div>
+    <script src="/api/plugin/page/bridge-sdk.js"></script>
+    <script>
+      (() => {
+        const bridge = window.AstrBotPluginView || window.AstrBotPluginPage;
+        const CURRENT = "__current__";
+        const state = {
+          personas: [],
+          persona: "",
+          versions: [],
+          ts: "",
+          kind: "old",
+          cache: new Map(),
+          dirty: false,
+        };
+
+        const el = (id) => document.getElementById(id);
+        const isCurrent = () => state.ts === CURRENT;
+        const isDiff = () => state.kind === "diff" && !isCurrent();
+
+        const toast = (msg, isError) => {
+          const node = el("toast");
+          node.textContent = msg;
+          node.className = "show" + (isError ? " error" : "");
+          clearTimeout(toast._t);
+          toast._t = setTimeout(() => (node.className = ""), 2600);
+        };
+
+        const unwrap = (res) => {
+          if (!res) return {};
+          if (res.status === "ok") return res.data || {};
+          if (res.status === "error") throw new Error(res.message || "请求失败");
+          return res;
+        };
+        const get = async (path, params) =>
+          unwrap(await bridge.apiGet("page/" + path, params || {}));
+        const post = async (path, body) =>
+          unwrap(await bridge.apiPost("page/" + path, body || {}));
+
+        const setDirty = (value) => {
+          state.dirty = value;
+          el("saveBtn").textContent = value ? "保存修改 *" : "保存修改";
+        };
+
+        // 逐行 LCS 对比，输出 [{t: " "|"+"|"-", s}]
+        // ---------------- 行级 + 词级 diff（仿 VS Code） ----------------
+        function tokenize(text) {
+          return text.match(/[A-Za-z0-9_]+|\s+|[^\s]/g) || [];
+        }
+
+        // 单行内部词级差异，返回 {oldParts, newParts}，chg=true 表示这段变了
+        function diffTokens(oldText, newText) {
+          const A = tokenize(oldText);
+          const B = tokenize(newText);
+          const n = A.length;
+          const m = B.length;
+          const dp = [];
+          for (let i = 0; i <= n; i++) dp.push(new Int32Array(m + 1));
+          for (let i = n - 1; i >= 0; i--) {
+            for (let j = m - 1; j >= 0; j--) {
+              dp[i][j] =
+                A[i] === B[j]
+                  ? dp[i + 1][j + 1] + 1
+                  : Math.max(dp[i + 1][j], dp[i][j + 1]);
+            }
+          }
+          const oldParts = [];
+          const newParts = [];
+          const push = (arr, str, chg) => {
+            const last = arr[arr.length - 1];
+            if (last && last.chg === chg) last.s += str;
+            else arr.push({ s: str, chg });
+          };
+          let i = 0;
+          let j = 0;
+          while (i < n && j < m) {
+            if (A[i] === B[j]) {
+              push(oldParts, A[i], false);
+              push(newParts, A[i], false);
+              i++;
+              j++;
+            } else if (dp[i + 1][j] >= dp[i][j + 1]) {
+              push(oldParts, A[i], true);
+              i++;
+            } else {
+              push(newParts, B[j], true);
+              j++;
+            }
+          }
+          while (i < n) push(oldParts, A[i++], true);
+          while (j < m) push(newParts, B[j++], true);
+          return { oldParts, newParts };
+        }
+
+        // 行级 LCS，返回带新旧行号的行
+        function diffLineRows(oldText, newText) {
+          const A = oldText.split("\n");
+          const B = newText.split("\n");
+          const n = A.length;
+          const m = B.length;
+          const dp = [];
+          for (let i = 0; i <= n; i++) dp.push(new Int32Array(m + 1));
+          for (let i = n - 1; i >= 0; i--) {
+            for (let j = m - 1; j >= 0; j--) {
+              dp[i][j] =
+                A[i] === B[j]
+                  ? dp[i + 1][j + 1] + 1
+                  : Math.max(dp[i + 1][j], dp[i][j + 1]);
+            }
+          }
+          const rows = [];
+          let i = 0;
+          let j = 0;
+          while (i < n && j < m) {
+            if (A[i] === B[j]) {
+              rows.push({ t: " ", text: A[i], oldNo: i + 1, newNo: j + 1 });
+              i++;
+              j++;
+            } else if (dp[i + 1][j] >= dp[i][j + 1]) {
+              rows.push({ t: "-", text: A[i], oldNo: i + 1, newNo: "" });
+              i++;
+            } else {
+              rows.push({ t: "+", text: B[j], oldNo: "", newNo: j + 1 });
+              j++;
+            }
+          }
+          while (i < n) {
+            rows.push({ t: "-", text: A[i], oldNo: i + 1, newNo: "" });
+            i++;
+          }
+          while (j < m) {
+            rows.push({ t: "+", text: B[j], oldNo: "", newNo: j + 1 });
+            j++;
+          }
+          return rows;
+        }
+
+        // 连续删除/新增按顺序配对，做行内高亮
+        function pairHunks(rows) {
+          const out = [];
+          let idx = 0;
+          while (idx < rows.length) {
+            if (rows[idx].t === " ") {
+              out.push(rows[idx]);
+              idx++;
+              continue;
+            }
+            const dels = [];
+            const adds = [];
+            while (idx < rows.length && rows[idx].t === "-") dels.push(rows[idx++]);
+            while (idx < rows.length && rows[idx].t === "+") adds.push(rows[idx++]);
+            const pairs = Math.min(dels.length, adds.length);
+            for (let k = 0; k < pairs; k++) {
+              const tokens = diffTokens(dels[k].text, adds[k].text);
+              dels[k].parts = tokens.oldParts;
+              adds[k].parts = tokens.newParts;
+            }
+            const total = Math.max(dels.length, adds.length);
+            for (let k = 0; k < total; k++) {
+              if (dels[k]) out.push(dels[k]);
+              if (adds[k]) out.push(adds[k]);
+            }
+          }
+          return out;
+        }
+
+        function renderDiffInto(container, oldText, newText) {
+          const rows = pairHunks(diffLineRows(oldText, newText));
+          const frag = document.createDocumentFragment();
+          let add = 0;
+          let del = 0;
+          let same = 0;
+          for (const row of rows) {
+            const line = document.createElement("div");
+            line.className =
+              "dline " + (row.t === "+" ? "add" : row.t === "-" ? "del" : "same");
+            const gutter = document.createElement("span");
+            gutter.className = "gutter";
+            const on = document.createElement("span");
+            on.className = "num";
+            on.textContent = row.oldNo === "" ? "" : String(row.oldNo);
+            const nn = document.createElement("span");
+            nn.className = "num";
+            nn.textContent = row.newNo === "" ? "" : String(row.newNo);
+            gutter.append(on, nn);
+
+            const sign = document.createElement("span");
+            sign.className = "sign";
+            sign.textContent = row.t === " " ? "" : row.t;
+
+            const txt = document.createElement("span");
+            txt.className = "txt";
+            if (row.parts) {
+              for (const part of row.parts) {
+                if (part.chg) {
+                  const mark = document.createElement("mark");
+                  mark.className = "chg";
+                  mark.textContent = part.s;
+                  txt.appendChild(mark);
+                } else {
+                  txt.appendChild(document.createTextNode(part.s));
+                }
+              }
+            } else {
+              txt.textContent = row.text;
+            }
+            line.append(gutter, sign, txt);
+            frag.appendChild(line);
+            if (row.t === "+") add++;
+            else if (row.t === "-") del++;
+            else same++;
+          }
+          container.innerHTML = "";
+          container.appendChild(frag);
+          return { add, del, same, total: rows.length };
+        }
+
+        function renderPersonas() {
+          const box = el("personas");
+          box.innerHTML = '<div class="side-title">人格</div>';
+          if (!state.personas.length) {
+            const empty = document.createElement("div");
+            empty.className = "empty";
+            empty.textContent = "没有可用人格";
+            box.appendChild(empty);
+            return;
+          }
+          for (const p of state.personas) {
+            const btn = document.createElement("button");
+            btn.className = "persona" + (p.id === state.persona ? " active" : "");
+            const name = document.createElement("div");
+            name.className = "name";
+            const dot = document.createElement("span");
+            dot.className = "dot" + (p.in_use ? "" : " off");
+            name.append(dot, document.createTextNode(p.id));
+            const sub = document.createElement("div");
+            sub.className = "sub";
+            sub.textContent =
+              `${p.chars} 字 · ${p.versions} 个版本` +
+              (p.in_use ? ` · ${p.sessions} 个会话` : " · 未在用");
+            btn.append(name, sub);
+            btn.onclick = () => selectPersona(p.id);
+            box.appendChild(btn);
+          }
+        }
+
+        function renderVersions() {
+          const box = el("versions");
+          box.innerHTML = "";
+          if (!state.persona) {
+            box.innerHTML = '<div class="empty">先选一份人格</div>';
+            return;
+          }
+          const pinned = document.createElement("div");
+          pinned.className = "ver pinned" + (isCurrent() ? " active" : "");
+          const row = document.createElement("div");
+          row.className = "row1";
+          row.append(document.createTextNode("当前人格（可直接编辑）"));
+          pinned.appendChild(row);
+          const sub = document.createElement("div");
+          sub.className = "sub";
+          sub.textContent = "保存前会自动备份";
+          pinned.appendChild(sub);
+          pinned.onclick = () => selectCurrent();
+          box.appendChild(pinned);
+
+          if (!state.versions.length) {
+            const empty = document.createElement("div");
+            empty.className = "empty";
+            empty.textContent = "还没有迭代记录，直接在右边改当前人格即可";
+            box.appendChild(empty);
+            return;
+          }
+          for (const v of state.versions) {
+            const item = document.createElement("div");
+            item.className = "ver" + (v.ts === state.ts ? " active" : "");
+            const row1 = document.createElement("div");
+            row1.className = "row1";
+            const ts = document.createElement("span");
+            ts.className = "ts";
+            ts.textContent = v.ts;
+            const trig = document.createElement("span");
+            trig.className = "sub";
+            trig.textContent = v.trigger || "";
+            row1.append(ts, trig);
+            const sub2 = document.createElement("div");
+            sub2.className = "sub";
+            sub2.textContent =
+              `${v.old_len || 0} → ${v.new_len || 0} 字` + (v.model ? ` · ${v.model}` : "");
+            item.append(row1, sub2);
+            item.onclick = () => openVersion(v.ts);
+            box.appendChild(item);
+          }
+        }
+
+        function renderDiff() {
+          const oldText = state.cache.get(state.ts + ":old") ?? "";
+          const newText = state.cache.get(state.ts + ":new") ?? "";
+          const stat = renderDiffInto(el("diffView"), oldText, newText);
+          el("diffHead").innerHTML = "";
+          const a = document.createElement("span");
+          a.className = "add";
+          a.textContent = `+${stat.add}`;
+          const d = document.createElement("span");
+          d.className = "del";
+          d.textContent = `-${stat.del}`;
+          const info = document.createElement("span");
+          info.style.color = "var(--muted)";
+          info.textContent = `未变 ${stat.same} 行`;
+          el("diffHead").append(a, d, info);
+        }
+
+        function renderDetail() {
+          const cur = isCurrent();
+          const diff = isDiff();
+          const has = Boolean(state.ts);
+          el("tabs").style.display = cur ? "none" : "flex";
+          el("editor").hidden = diff;
+          el("diffView").hidden = !diff;
+          el("diffHead").hidden = !diff;
+          el("editor").disabled = !has || diff;
+          el("saveBtn").disabled = !has || diff;
+          el("applyBtn").disabled = !has || cur || diff;
+          el("deleteBtn").disabled = !has || cur || diff;
+          el("hint").textContent = cur
+            ? "正在编辑当前生效的人格，保存后下一轮对话立即生效，旧内容会自动进入历史版本。"
+            : diff
+              ? "红色是这次被删掉的，绿色是新写的。对比模式只读。"
+              : "";
+          document.querySelectorAll(".tabs button").forEach((b) => {
+            b.classList.toggle("active", b.dataset.kind === state.kind);
+          });
+
+          if (diff) {
+            renderDiff();
+            el("count").textContent = "差异对比";
+            setDirty(false);
+            return;
+          }
+          const key = cur ? CURRENT : state.ts + ":" + state.kind;
+          const text = has ? state.cache.get(key) ?? "" : "";
+          if (el("editor").value !== text) el("editor").value = text;
+          el("count").textContent = !has
+            ? "—"
+            : (cur ? "当前人格" : state.kind === "old" ? "迭代前" : "迭代后") +
+              ` · ${text.length} 字`;
+          setDirty(false);
+        }
+
+        async function ensureVersionTexts(ts) {
+          for (const kind of ["old", "new"]) {
+            const key = ts + ":" + kind;
+            if (!state.cache.has(key)) {
+              const data = await get("version", {
+                persona: state.persona,
+                ts,
+                kind,
+              });
+              state.cache.set(key, data.text || "");
+            }
+          }
+        }
+
+        async function loadState() {
+          const data = await get("state");
+          state.personas = data.personas || [];
+          el("meta").textContent =
+            `间隔 ${data.interval_days} 天 · 上限 ${data.max_chars} 字` +
+            (data.enabled ? "" : " · 自动迭代已关闭") +
+            (data.dry_run ? " · 自动迭代为演练模式" : "");
+          if (!state.persona && state.personas.length) {
+            state.persona = (state.personas.find((p) => p.in_use) || state.personas[0]).id;
+          }
+          if (!state.persona) {
+            el("personas").innerHTML =
+              '<div class="side-title">人格</div><div class="empty">还没有任何人格</div>';
+            return;
+          }
+          renderPersonas();
+          await loadVersions(state.persona, true);
+        }
+
+        async function loadVersions(persona, keepCurrent) {
+          state.cache.clear();
+          el("currentText").textContent = "加载中…";
+          const data = await get("versions", { persona });
+          state.versions = data.items || [];
+          el("currentText").textContent = data.current || "（空）";
+          el("verTitle").textContent = `版本 · ${persona}`;
+          state.ts = CURRENT;
+          state.kind = "old";
+          state.cache.set(CURRENT, data.current || "");
+          renderVersions();
+          renderDetail();
+        }
+
+        async function selectPersona(persona) {
+          if (state.dirty && !confirm("有未保存的修改，确定切换？")) return;
+          state.persona = persona;
+          renderPersonas();
+          await loadVersions(persona, true);
+        }
+
+        async function selectCurrent() {
+          if (state.dirty && !confirm("有未保存的修改，确定切换？")) return;
+          const data = await get("versions", { persona: state.persona });
+          state.cache.set(CURRENT, data.current || "");
+          state.versions = data.items || [];
+          el("currentText").textContent = data.current || "（空）";
+          state.ts = CURRENT;
+          state.kind = "old";
+          renderVersions();
+          renderDetail();
+        }
+
+        async function openVersion(ts) {
+          if (state.dirty && !confirm("有未保存的修改，确定切换？")) return;
+          state.ts = ts;
+          await ensureVersionTexts(ts);
+          renderVersions();
+          renderDetail();
+        }
+
+        async function switchKind(kind) {
+          if (!state.ts || isCurrent()) return;
+          if (state.dirty && !confirm("有未保存的修改，确定切换？")) return;
+          state.kind = kind;
+          if (kind === "diff") {
+            await ensureVersionTexts(state.ts);
+          } else {
+            const key = state.ts + ":" + kind;
+            if (!state.cache.has(key)) {
+              const data = await get("version", {
+                persona: state.persona,
+                ts: state.ts,
+                kind,
+              });
+              state.cache.set(key, data.text || "");
+            }
+          }
+          renderDetail();
+        }
+
+        async function save() {
+          if (!state.ts) return;
+          const text = el("editor").value;
+          if (isCurrent()) {
+            const data = await post("persona/save", { persona: state.persona, text });
+            state.cache.set(CURRENT, text);
+            el("currentText").textContent = text;
+            setDirty(false);
+            await loadVersions(state.persona, true);
+            toast(data.unchanged ? "内容没变化" : `已保存：${data.old_chars} → ${data.chars} 字`);
+            return;
+          }
+          const data = await post("version/save", {
+            persona: state.persona,
+            ts: state.ts,
+            kind: state.kind,
+            text,
+          });
+          state.cache.set(state.ts + ":" + state.kind, text);
+          const item = state.versions.find((v) => v.ts === state.ts);
+          if (item) item[state.kind + "_len"] = data.chars;
+          setDirty(false);
+          renderVersions();
+          renderDetail();
+          toast("已保存");
+        }
+
+        async function applyVersion() {
+          if (!state.ts || isCurrent() || isDiff()) return;
+          if (
+            !confirm(
+              `把「${state.ts}」的${state.kind === "old" ? "迭代前" : "迭代后"}内容写入 ${state.persona} 当前生效的人格？\n当前人格会先自动备份。`
+            )
+          )
+            return;
+          const data = await post("version/apply", {
+            persona: state.persona,
+            ts: state.ts,
+            kind: state.kind,
+          });
+          await loadState();
+          toast(`已应用：${data.old_chars} → ${data.chars} 字`);
+        }
+
+        async function removeVersion() {
+          if (!state.ts || isCurrent() || isDiff()) return;
+          if (!confirm(`删除版本 ${state.ts}？文件会一起删掉，不可恢复。`)) return;
+          await post("version/delete", { persona: state.persona, ts: state.ts });
+          state.ts = CURRENT;
+          state.cache.clear();
+          await loadVersions(state.persona, true);
+          toast("已删除");
+        }
+
+        let modalSaveHandler = null;
+
+        function openModal(options) {
+          el("modalTitle").textContent = options.title || "";
+          el("modalMeta").textContent = options.meta || "";
+          const body = el("modalBody");
+          body.innerHTML = "";
+          if (options.diff) {
+            const stat = renderDiffInto(body, options.oldText || "", options.newText || "");
+            el("modalCount").textContent = `+${stat.add} / -${stat.del}`;
+            el("modalFoot").hidden = !options.onSave;
+            el("modalSave").hidden = !options.onSave;
+          } else {
+            body.textContent = options.text || "";
+            el("modalCount").textContent = "";
+            el("modalFoot").hidden = true;
+          }
+          modalSaveHandler = options.onSave || null;
+          el("modal").hidden = false;
+        }
+
+        function closeModal() {
+          el("modal").hidden = true;
+          modalSaveHandler = null;
+        }
+
+        async function runIteration(dry) {
+          if (!state.persona) return;
+          if (state.dirty && !confirm("当前有未保存的修改，继续会丢掉它们，确定？")) return;
+          const btn = dry ? el("dryBtn") : el("runBtn");
+          const other = dry ? el("runBtn") : el("dryBtn");
+          const label = btn.textContent;
+          btn.disabled = true;
+          other.disabled = true;
+          btn.textContent = dry ? "演练中…" : "迭代中…";
+          try {
+            const data = await post("run", { persona: state.persona, dry_run: dry });
+            if (!data.ok) {
+              toast(data.reason || "没有生成新内容", true);
+              return;
+            }
+            if (dry) {
+              openModal({
+                title: "演练结果（未写入人格）",
+                meta:
+                  `${data.persona} · ${data.old_len} → ${data.new_len} 字` +
+                  (data.preview ? ` · 已存 ${data.preview}` : ""),
+                diff: true,
+                oldText: state.cache.get(CURRENT) ?? "",
+                newText: data.text,
+                onSave: async () => {
+                  const saved = await post("persona/save", {
+                    persona: state.persona,
+                    text: data.text,
+                    trigger: "演练确认",
+                  });
+                  closeModal();
+                  toast(`已应用：${saved.old_chars} → ${saved.chars} 字`);
+                  await loadState();
+                  if (state.versions.length) {
+                    await openVersion(state.versions[0].ts);
+                    await switchKind("diff");
+                  }
+                },
+              });
+              return;
+            }
+            toast(`已更新：${data.old_len} → ${data.new_len} 字`);
+            await loadState();
+            if (state.versions.length) {
+              await openVersion(state.versions[0].ts);
+              await switchKind("diff");
+            }
+          } finally {
+            btn.disabled = false;
+            other.disabled = false;
+            btn.textContent = label;
+          }
+        }
+
+        function bind() {
+          el("reload").onclick = () => loadState().catch((e) => toast(e.message, true));
+          el("dryBtn").onclick = () => runIteration(true).catch((e) => toast(e.message, true));
+          el("runBtn").onclick = () => runIteration(false).catch((e) => toast(e.message, true));
+          el("modalClose").onclick = closeModal;
+          el("modalCancel").onclick = closeModal;
+          el("modalSave").onclick = () => {
+            if (!modalSaveHandler) return;
+            Promise.resolve(modalSaveHandler()).catch((e) => toast(e.message, true));
+          };
+          el("modal").onclick = (e) => {
+            if (e.target === el("modal")) closeModal();
+          };
+          el("refreshVersions").onclick = () =>
+            state.persona &&
+            loadVersions(state.persona, true).catch((e) => toast(e.message, true));
+          el("editor").addEventListener("input", () => {
+            const key = isCurrent() ? CURRENT : state.ts + ":" + state.kind;
+            const changed = el("editor").value !== (state.cache.get(key) ?? "");
+            setDirty(changed);
+            const label = isCurrent()
+              ? "当前人格"
+              : state.kind === "old"
+                ? "迭代前"
+                : "迭代后";
+            el("count").textContent = `${label} · ${el("editor").value.length} 字`;
+          });
+          el("saveBtn").onclick = () => save().catch((e) => toast(e.message, true));
+          el("applyBtn").onclick = () => applyVersion().catch((e) => toast(e.message, true));
+          el("deleteBtn").onclick = () => removeVersion().catch((e) => toast(e.message, true));
+          document.querySelectorAll(".tabs button").forEach((b) => {
+            b.onclick = () => switchKind(b.dataset.kind).catch((e) => toast(e.message, true));
+          });
+          window.addEventListener("beforeunload", (e) => {
+            if (state.dirty) {
+              e.preventDefault();
+              e.returnValue = "";
+            }
+          });
+        }
+
+        async function boot() {
+          bind();
+          if (!bridge) {
+            el("meta").textContent = "Bridge 不可用，请从 AstrBot 面板打开";
+            return;
+          }
+          try {
+            await bridge.ready();
+            await loadState();
+          } catch (err) {
+            el("meta").textContent = "加载失败：" + err.message;
+            toast(err.message, true);
+          }
+        }
+
+        boot();
+      })();
+    </script>
+  </body>
+</html>
