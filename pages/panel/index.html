@@ -435,6 +435,7 @@
             </div>
             <div class="actions">
               <span class="count" id="count">—</span>
+              <button id="revertBtn" disabled>放弃修改</button>
               <button id="saveBtn" disabled>保存修改</button>
               <button id="applyBtn" class="primary" disabled>应用到当前人格</button>
               <button id="deleteBtn" class="danger" disabled>删除版本</button>
@@ -471,12 +472,16 @@
           ts: "",
           kind: "old",
           cache: new Map(),
+          drafts: new Map(),
           dirty: false,
         };
 
         const el = (id) => document.getElementById(id);
         const isCurrent = () => state.ts === CURRENT;
         const isDiff = () => state.kind === "diff" && !isCurrent();
+        const cacheKey = () =>
+          isCurrent() ? CURRENT : state.ts + ":" + state.kind;
+        const draftKey = () => `${state.persona}|${cacheKey()}`;
 
         const toast = (msg, isError) => {
           const node = el("toast");
@@ -784,18 +789,25 @@
 
           if (diff) {
             renderDiff();
+            el("revertBtn").disabled = true;
             el("count").textContent = "差异对比";
             setDirty(false);
             return;
           }
-          const key = cur ? CURRENT : state.ts + ":" + state.kind;
-          const text = has ? state.cache.get(key) ?? "" : "";
+          const saved = has ? state.cache.get(cacheKey()) ?? "" : "";
+          const draft = has ? state.drafts.get(draftKey()) : undefined;
+          const text = draft === undefined ? saved : draft;
           if (el("editor").value !== text) el("editor").value = text;
+          const dirty = has && text !== saved;
+          setDirty(dirty);
+          el("revertBtn").disabled = !dirty;
           el("count").textContent = !has
             ? "—"
             : (cur ? "当前人格" : state.kind === "old" ? "迭代前" : "迭代后") +
               ` · ${text.length} 字`;
-          setDirty(false);
+          if (dirty) {
+            el("hint").textContent = "有未保存的修改，先放着不会丢，切回来还在这；要写入人格请点保存。";
+          }
         }
 
         async function ensureVersionTexts(ts) {
@@ -846,14 +858,12 @@
         }
 
         async function selectPersona(persona) {
-          if (state.dirty && !confirm("有未保存的修改，确定切换？")) return;
           state.persona = persona;
           renderPersonas();
           await loadVersions(persona, true);
         }
 
         async function selectCurrent() {
-          if (state.dirty && !confirm("有未保存的修改，确定切换？")) return;
           const data = await get("versions", { persona: state.persona });
           state.cache.set(CURRENT, data.current || "");
           state.versions = data.items || [];
@@ -865,7 +875,6 @@
         }
 
         async function openVersion(ts) {
-          if (state.dirty && !confirm("有未保存的修改，确定切换？")) return;
           state.ts = ts;
           await ensureVersionTexts(ts);
           renderVersions();
@@ -874,7 +883,6 @@
 
         async function switchKind(kind) {
           if (!state.ts || isCurrent()) return;
-          if (state.dirty && !confirm("有未保存的修改，确定切换？")) return;
           state.kind = kind;
           if (kind === "diff") {
             await ensureVersionTexts(state.ts);
@@ -894,11 +902,13 @@
 
         async function save() {
           if (!state.ts) return;
+          const dkey = draftKey();
           const text = el("editor").value;
           if (isCurrent()) {
             const data = await post("persona/save", { persona: state.persona, text });
             state.cache.set(CURRENT, text);
             el("currentText").textContent = text;
+            state.drafts.delete(dkey);
             setDirty(false);
             await loadVersions(state.persona, true);
             toast(data.unchanged ? "内容没变化" : `已保存：${data.old_chars} → ${data.chars} 字`);
@@ -911,6 +921,7 @@
             text,
           });
           state.cache.set(state.ts + ":" + state.kind, text);
+          state.drafts.delete(dkey);
           const item = state.versions.find((v) => v.ts === state.ts);
           if (item) item[state.kind + "_len"] = data.chars;
           setDirty(false);
@@ -974,7 +985,6 @@
 
         async function runIteration(dry) {
           if (!state.persona) return;
-          if (state.dirty && !confirm("当前有未保存的修改，继续会丢掉它们，确定？")) return;
           const btn = dry ? el("dryBtn") : el("runBtn");
           const other = dry ? el("runBtn") : el("dryBtn");
           const label = btn.textContent;
@@ -1026,6 +1036,12 @@
           }
         }
 
+        function revertDraft() {
+          if (!state.ts) return;
+          state.drafts.delete(draftKey());
+          renderDetail();
+        }
+
         function bind() {
           el("reload").onclick = () => loadState().catch((e) => toast(e.message, true));
           el("dryBtn").onclick = () => runIteration(true).catch((e) => toast(e.message, true));
@@ -1043,17 +1059,26 @@
             state.persona &&
             loadVersions(state.persona, true).catch((e) => toast(e.message, true));
           el("editor").addEventListener("input", () => {
-            const key = isCurrent() ? CURRENT : state.ts + ":" + state.kind;
-            const changed = el("editor").value !== (state.cache.get(key) ?? "");
+            if (!state.ts) return;
+            const saved = state.cache.get(cacheKey()) ?? "";
+            const value = el("editor").value;
+            if (value === saved) state.drafts.delete(draftKey());
+            else state.drafts.set(draftKey(), value);
+            const changed = value !== saved;
             setDirty(changed);
+            el("revertBtn").disabled = !changed;
             const label = isCurrent()
               ? "当前人格"
               : state.kind === "old"
                 ? "迭代前"
                 : "迭代后";
-            el("count").textContent = `${label} · ${el("editor").value.length} 字`;
+            el("count").textContent = `${label} · ${value.length} 字`;
+            el("hint").textContent = changed
+              ? "有未保存的修改，先放着不会丢，切回来还在这；要写入人格请点保存。"
+              : "";
           });
           el("saveBtn").onclick = () => save().catch((e) => toast(e.message, true));
+          el("revertBtn").onclick = revertDraft;
           el("applyBtn").onclick = () => applyVersion().catch((e) => toast(e.message, true));
           el("deleteBtn").onclick = () => removeVersion().catch((e) => toast(e.message, true));
           document.querySelectorAll(".tabs button").forEach((b) => {
