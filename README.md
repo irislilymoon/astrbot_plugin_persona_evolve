@@ -70,6 +70,15 @@
 | `run_on_start` | false | 首次加载不立即跑，先记录起点 |
 | `notify` | false | 迭代后在私聊/webchat 发一条通知，不发群 |
 
+## 配合 LivingMemory 使用
+
+长期记忆取材依赖 [LivingMemory](https://github.com/lxfight-s-Astrbot-Plugins/astrbot_plugin_livingmemory)
+插件（AstrBot 插件市场里搜 **LivingMemory**，作者 lxfight）。
+
+- 不装它也能跑：只是没有记忆取材，只剩对话上下文，其余功能不受影响
+- 装了之后自动生效：只读它的 `plugin_data/astrbot_plugin_livingmemory/livingmemory.db`（只读，不写入）
+- LivingMemory 按对话分割记忆，本插件同样按对话取材，只会取「属于这份人格」的那些会话，不会串台
+
 ## 取材来源
 
 - **对话**：AstrBot 自己的 `conversations` 表，只取实际使用同一人格、时间范围内的最近 3 个会话。
