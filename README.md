@@ -63,7 +63,7 @@
 | `max_personas_per_run` | 3 | 每轮最多迭代几份 |
 | `max_chars` | 800 | 改写后字数上限，超出按句子边界裁剪 |
 | `min_chars` | 200 | 低于此长度视为失败，保留原人格 |
-| `keep_lines` | 禁止发布任何网络链接。 | 强制保留的硬性规则行 |
+| `keep_lines` | 空 | 可选，想强制保留的规则行；默认不注入任何内容 |
 | `recent_days` | 7 | 只读这段时间内的素材 |
 | `use_livingmemory` | true | 只读 LivingMemory 的 livingmemory.db |
 | `dry_run` | false | 只生成不写入 |
