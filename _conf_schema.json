@@ -78,10 +78,11 @@
     "default": ""
   },
   "provider_id": {
-    "description": "用于改写的模型 ID",
+    "description": "用于改写的模型",
     "type": "string",
-    "hint": "留空使用当前默认对话模型。填了就用指定的那个。",
-    "default": ""
+    "default": "",
+    "_special": "select_provider",
+    "hint": "从下拉里选一个模型；留空则使用当前默认对话模型。"
   },
   "dry_run": {
     "description": "演练模式",
