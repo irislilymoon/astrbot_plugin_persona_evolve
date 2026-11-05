@@ -666,8 +666,8 @@ class PersonaEvolve(Star):
         """读长期记忆。
 
         LivingMemory 按对话分割记忆，atom 上有 session_id（就是 umo）。
-        所以优先按「属于这个人格的那些会话」过滤，保证不会把私聊的记忆写进群聊人格；
-        该人格还没有任何记忆时，再退回按 persona_id 过滤，最后才不加限制。
+        所以只按「属于这个人格的那些会话」过滤，保证不会把私聊的记忆写进群聊人格；
+        没有命中时不退回整库读取，宁可不喂记忆也不跨会话取材。
         """
         db_path = (
             self.data_root
@@ -686,10 +686,17 @@ class PersonaEvolve(Star):
         if sessions:
             marks = ",".join("?" * len(sessions))
             attempts.append((f"and session_id in ({marks})", tuple(sessions)))
+        # 第二级只接受「没有绑定会话」的遗留记忆。不能直接按 persona_id 兜底：
+        # 一份人格被多个会话共用时，那样会把别的会话的记忆也算进来。
         attempts.append(
-            ("and (persona_id = ? or persona_id is null or persona_id = '')", (persona_id,))
+            (
+                "and (session_id is null or session_id = '') "
+                "and (persona_id = ? or persona_id is null or persona_id = '')",
+                (persona_id,),
+            )
         )
-        attempts.append(("", ()))
+        # 不再提供「无任何过滤」的兜底：人格自己没有可用记忆时，宁可不喂记忆，
+        # 也不能把整库记忆读进来，否则会拿 A 群的记忆去改写 B 群的人格。
 
         sql = (
             "select content from memory_atoms "
