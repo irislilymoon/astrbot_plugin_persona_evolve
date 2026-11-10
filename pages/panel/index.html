@@ -317,6 +317,9 @@
         border-top: 1px solid var(--line);
       }
       .modal-foot .count { margin-right: auto; color: var(--muted); font-size: 13px; }
+      .modal-card.narrow { width: min(440px, 100%); }
+      .confirm-text { padding: 14px 16px 6px; white-space: pre-wrap; word-break: break-word; }
+      .modal-foot.end { justify-content: flex-end; }
 
       /* ---- diff 行 ---- */
       .dline {
@@ -455,6 +458,16 @@
             <span class="count" id="modalCount"></span>
             <button id="modalCancel">取消</button>
             <button id="modalSave" class="primary">保存并应用</button>
+          </div>
+        </div>
+      </div>
+      <div class="modal" id="confirmModal" hidden>
+        <div class="modal-card narrow">
+          <div class="modal-head"><span>请确认</span></div>
+          <div class="confirm-text" id="confirmText"></div>
+          <div class="modal-foot end">
+            <button id="confirmCancel">取消</button>
+            <button id="confirmOk" class="primary">确定</button>
           </div>
         </div>
       </div>
@@ -933,9 +946,10 @@
         async function applyVersion() {
           if (!state.ts || isCurrent() || isDiff()) return;
           if (
-            !confirm(
-              `把「${state.ts}」的${state.kind === "old" ? "迭代前" : "迭代后"}内容写入 ${state.persona} 当前生效的人格？\n当前人格会先自动备份。`
-            )
+            !(await askConfirm(
+              `把「${state.ts}」的${state.kind === "old" ? "迭代前" : "迭代后"}内容写入 ${state.persona} 当前生效的人格？\n当前人格会先自动备份。`,
+              "应用"
+            ))
           )
             return;
           const data = await post("version/apply", {
@@ -949,12 +963,29 @@
 
         async function removeVersion() {
           if (!state.ts || isCurrent() || isDiff()) return;
-          if (!confirm(`删除版本 ${state.ts}？文件会一起删掉，不可恢复。`)) return;
+          if (!(await askConfirm(`删除版本 ${state.ts}？文件会一起删掉，不可恢复。`, "删除", true))) return;
           await post("version/delete", { persona: state.persona, ts: state.ts });
           state.ts = CURRENT;
           state.cache.clear();
           await loadVersions(state.persona, true);
           toast("已删除");
+        }
+
+        // 面板 iframe 的 sandbox 不含 allow-modals，原生 confirm() 会静默返回 false
+        let confirmResolve = null;
+        function askConfirm(message, okLabel, danger) {
+          el("confirmText").textContent = message;
+          el("confirmOk").textContent = okLabel || "确定";
+          el("confirmOk").className = danger ? "danger" : "primary";
+          el("confirmModal").hidden = false;
+          return new Promise((resolve) => { confirmResolve = resolve; });
+        }
+        function closeConfirm(answer) {
+          el("confirmModal").hidden = true;
+          if (confirmResolve) {
+            confirmResolve(answer);
+            confirmResolve = null;
+          }
         }
 
         let modalSaveHandler = null;
@@ -1054,6 +1085,11 @@
           };
           el("modal").onclick = (e) => {
             if (e.target === el("modal")) closeModal();
+          };
+          el("confirmOk").onclick = () => closeConfirm(true);
+          el("confirmCancel").onclick = () => closeConfirm(false);
+          el("confirmModal").onclick = (e) => {
+            if (e.target === el("confirmModal")) closeConfirm(false);
           };
           el("refreshVersions").onclick = () =>
             state.persona &&
